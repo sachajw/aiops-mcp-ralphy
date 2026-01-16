@@ -68,6 +68,7 @@ retry_count=0
 declare -a parallel_pids=()
 declare -a task_branches=()
 WORKTREE_BASE=""  # Base directory for parallel agent worktrees
+ORIGINAL_DIR=""   # Original working directory (for worktree operations)
 
 # ============================================
 # UTILITY FUNCTIONS
@@ -1116,12 +1117,19 @@ create_agent_worktree() {
   local branch_name="ralphy/agent-${agent_num}-$(slugify "$task_name")"
   local worktree_dir="${WORKTREE_BASE}/agent-${agent_num}"
   
-  # Create branch from base
-  git branch -f "$branch_name" "$BASE_BRANCH" 2>/dev/null || true
-  
-  # Create worktree
-  rm -rf "$worktree_dir" 2>/dev/null || true
-  git worktree add -f "$worktree_dir" "$branch_name" 2>/dev/null
+  # Run git commands from original directory
+  (
+    cd "$ORIGINAL_DIR" || exit 1
+    
+    # Create branch from base (force to reset if exists)
+    git branch -f "$branch_name" "$BASE_BRANCH" 2>/dev/null || true
+    
+    # Remove existing worktree dir if any
+    rm -rf "$worktree_dir" 2>/dev/null || true
+    
+    # Create worktree
+    git worktree add -f "$worktree_dir" "$branch_name" 2>/dev/null
+  )
   
   echo "$worktree_dir|$branch_name"
 }
@@ -1131,7 +1139,11 @@ cleanup_agent_worktree() {
   local worktree_dir="$1"
   local branch_name="$2"
   
-  git worktree remove -f "$worktree_dir" 2>/dev/null || true
+  # Run from original directory
+  (
+    cd "$ORIGINAL_DIR" || exit 1
+    git worktree remove -f "$worktree_dir" 2>/dev/null || true
+  )
   # Don't delete branch - it may have commits we want to keep/PR
 }
 
@@ -1160,9 +1172,9 @@ run_parallel_agent() {
   
   echo "running" > "$status_file"
   
-  # Copy PRD file to worktree if it's not tracked by git
+  # Copy PRD file to worktree from original directory
   if [[ "$PRD_SOURCE" == "markdown" ]] || [[ "$PRD_SOURCE" == "yaml" ]]; then
-    cp "$PRD_FILE" "$worktree_dir/" 2>/dev/null || true
+    cp "$ORIGINAL_DIR/$PRD_FILE" "$worktree_dir/" 2>/dev/null || true
   fi
   
   # Ensure progress.txt exists in worktree
@@ -1281,15 +1293,24 @@ run_parallel_tasks() {
   local total_tasks=${#tasks[@]}
   log_info "Found $total_tasks tasks to process"
   
+  # Store original directory for git operations from subshells
+  ORIGINAL_DIR=$(pwd)
+  export ORIGINAL_DIR
+  
   # Set up worktree base directory
   WORKTREE_BASE=$(mktemp -d)
+  export WORKTREE_BASE
   log_debug "Worktree base: $WORKTREE_BASE"
   
   # Ensure we have a base branch set
   if [[ -z "$BASE_BRANCH" ]]; then
     BASE_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
   fi
+  export BASE_BRANCH
   log_info "Base branch: $BASE_BRANCH"
+  
+  # Export variables needed by subshell agents
+  export USE_OPENCODE MAX_RETRIES RETRY_DELAY PRD_SOURCE PRD_FILE CREATE_PR PR_DRAFT
   
   # Process tasks in batches
   local batch_start=0
