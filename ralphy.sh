@@ -1184,7 +1184,7 @@ run_single_task() {
 
     # Check for empty response
     if [[ -z "$result" ]]; then
-      ((retry_count++))
+      ((retry_count++)) || true
       log_error "Empty response (attempt $retry_count/$MAX_RETRIES)"
       if [[ $retry_count -lt $MAX_RETRIES ]]; then
         log_info "Retrying in ${RETRY_DELAY}s..."
@@ -1200,7 +1200,7 @@ run_single_task() {
     # Check for API errors
     local error_msg
     if ! error_msg=$(check_for_errors "$result"); then
-      ((retry_count++))
+      ((retry_count++)) || true
       log_error "API error: $error_msg (attempt $retry_count/$MAX_RETRIES)"
       if [[ $retry_count -lt $MAX_RETRIES ]]; then
         log_info "Retrying in ${RETRY_DELAY}s..."
@@ -1478,7 +1478,7 @@ Focus only on implementing: $task_name"
     if [[ -n "$result" ]]; then
       local error_msg
       if ! error_msg=$(check_for_errors "$result"); then
-        ((retry++))
+        ((retry++)) || true
         echo "API error: $error_msg (attempt $retry/$MAX_RETRIES)" >> "$log_file"
         sleep "$RETRY_DELAY"
         continue
@@ -1487,7 +1487,7 @@ Focus only on implementing: $task_name"
       break
     fi
     
-    ((retry++))
+    ((retry++)) || true
     echo "Retry $retry/$MAX_RETRIES after empty response" >> "$log_file"
     sleep "$RETRY_DELAY"
   done
@@ -1615,7 +1615,7 @@ run_parallel_tasks() {
     local total_group_tasks=${#tasks[@]}
 
     while [[ $batch_start -lt $total_group_tasks ]]; do
-      ((batch_num++))
+      ((batch_num++)) || true
       local batch_end=$((batch_start + MAX_PARALLEL))
       [[ $batch_end -gt $total_group_tasks ]] && batch_end=$total_group_tasks
       local batch_size=$((batch_end - batch_start))
@@ -1638,7 +1638,7 @@ run_parallel_tasks() {
       for ((i = batch_start; i < batch_end; i++)); do
         local task="${tasks[$i]}"
         local agent_num=$((iteration + 1))
-        ((iteration++))
+        ((iteration++)) || true
 
         local status_file=$(mktemp)
         local output_file=$(mktemp)
@@ -1684,17 +1684,17 @@ run_parallel_tasks() {
           case "$status" in
             "setting up")
               all_done=false
-              ((setting_up++))
+              ((setting_up++)) || true
               ;;
             running)
               all_done=false
-              ((running++))
+              ((running++)) || true
               ;;
             done)
-              ((done_count++))
+              ((done_count++)) || true
               ;;
             failed)
-              ((failed_count++))
+              ((failed_count++)) || true
               ;;
             *)
               # Check if process is still running
@@ -2090,7 +2090,7 @@ main() {
 
   # Sequential main loop
   while true; do
-    ((iteration++))
+    ((iteration++)) || true
     local result_code=0
     run_single_task "" "$iteration" || result_code=$?
     
