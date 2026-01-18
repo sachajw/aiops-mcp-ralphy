@@ -1811,7 +1811,7 @@ run_parallel_tasks() {
       if git branch "$integration_branch" "$BASE_BRANCH" >/dev/null 2>&1; then
         local merge_failed=false
         local current_head
-        current_head=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+        current_head=$(git symbolic-ref --short HEAD 2>/dev/null || echo "")
 
         # Temporarily checkout the integration branch to perform merges
         if git checkout "$integration_branch" >/dev/null 2>&1; then
@@ -1827,7 +1827,11 @@ run_parallel_tasks() {
           done
 
           # Return to original HEAD to avoid state confusion
-          git checkout "$current_head" >/dev/null 2>&1 || git checkout "$ORIGINAL_BASE_BRANCH" >/dev/null 2>&1 || true
+          if [[ -n "$current_head" ]]; then
+            git checkout "$current_head" >/dev/null 2>&1 || git checkout "$ORIGINAL_BASE_BRANCH" >/dev/null 2>&1 || true
+          else
+            git checkout "$ORIGINAL_BASE_BRANCH" >/dev/null 2>&1 || true
+          fi
 
           if [[ "$merge_failed" == false ]]; then
             # Update BASE_BRANCH for next group
