@@ -92,6 +92,59 @@ export function checkForErrors(output: string): string | null {
 }
 
 /**
+ * Read a stream line by line, calling onLine for each non-empty line
+ */
+async function readStream(
+	reader: ReadableStreamDefaultReader<Uint8Array>,
+	onLine: (line: string) => void
+): Promise<void> {
+	const decoder = new TextDecoder();
+	let buffer = "";
+	try {
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			buffer += decoder.decode(value, { stream: true });
+			const lines = buffer.split("\n");
+			buffer = lines.pop() || "";
+			for (const line of lines) {
+				if (line.trim()) onLine(line);
+			}
+		}
+		if (buffer.trim()) onLine(buffer);
+	} finally {
+		reader.releaseLock();
+	}
+}
+
+/**
+ * Execute a command with streaming output, calling onLine for each line
+ */
+export async function execCommandStreaming(
+	command: string,
+	args: string[],
+	workDir: string,
+	onLine: (line: string) => void,
+	env?: Record<string, string>
+): Promise<{ exitCode: number }> {
+	const proc = Bun.spawn([command, ...args], {
+		cwd: workDir,
+		stdout: "pipe",
+		stderr: "pipe",
+		env: { ...process.env, ...env },
+	});
+
+	// Process both stdout and stderr in parallel
+	await Promise.all([
+		readStream(proc.stdout.getReader(), onLine),
+		readStream(proc.stderr.getReader(), onLine),
+	]);
+
+	const exitCode = await proc.exited;
+	return { exitCode };
+}
+
+/**
  * Base implementation for AI engines
  */
 export abstract class BaseAIEngine implements AIEngine {
