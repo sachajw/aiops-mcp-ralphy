@@ -107,34 +107,52 @@ export async function execCommandStreaming(
 		env: { ...process.env, ...env },
 	});
 
+	// Drain stderr to prevent buffer filling up
+	const drainStderr = async () => {
+		const stderrReader = proc.stderr.getReader();
+		try {
+			while (true) {
+				const { done } = await stderrReader.read();
+				if (done) break;
+			}
+		} finally {
+			stderrReader.releaseLock();
+		}
+	};
+
 	// Read stdout line by line
-	const reader = proc.stdout.getReader();
-	const decoder = new TextDecoder();
-	let buffer = "";
+	const processStdout = async () => {
+		const reader = proc.stdout.getReader();
+		const decoder = new TextDecoder();
+		let buffer = "";
 
-	try {
-		while (true) {
-			const { done, value } = await reader.read();
-			if (done) break;
+		try {
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
 
-			buffer += decoder.decode(value, { stream: true });
-			const lines = buffer.split("\n");
-			buffer = lines.pop() || "";
+				buffer += decoder.decode(value, { stream: true });
+				const lines = buffer.split("\n");
+				buffer = lines.pop() || "";
 
-			for (const line of lines) {
-				if (line.trim()) {
-					onLine(line);
+				for (const line of lines) {
+					if (line.trim()) {
+						onLine(line);
+					}
 				}
 			}
-		}
 
-		// Process any remaining buffer
-		if (buffer.trim()) {
-			onLine(buffer);
+			// Process any remaining buffer
+			if (buffer.trim()) {
+				onLine(buffer);
+			}
+		} finally {
+			reader.releaseLock();
 		}
-	} finally {
-		reader.releaseLock();
-	}
+	};
+
+	// Process stdout and drain stderr in parallel
+	await Promise.all([processStdout(), drainStderr()]);
 
 	const exitCode = await proc.exited;
 	return { exitCode };
@@ -145,8 +163,14 @@ export async function execCommandStreaming(
  * Returns step name like "Reading code", "Implementing", etc.
  */
 export function detectStepFromOutput(line: string): string | null {
+	// Fast path: skip non-JSON lines
+	const trimmed = line.trim();
+	if (!trimmed.startsWith("{")) {
+		return null;
+	}
+
 	try {
-		const parsed = JSON.parse(line);
+		const parsed = JSON.parse(trimmed);
 
 		// Check for tool calls in various formats
 		const toolName =
