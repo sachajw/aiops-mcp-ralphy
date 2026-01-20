@@ -32,7 +32,7 @@ export interface AIEngine {
 	executeStreaming?(
 		prompt: string,
 		workDir: string,
-		onProgress: ProgressCallback
+		onProgress: ProgressCallback,
 	): Promise<AIResult>;
 }
 

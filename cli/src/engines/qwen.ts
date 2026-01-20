@@ -1,10 +1,10 @@
 import {
 	BaseAIEngine,
 	checkForErrors,
+	detectStepFromOutput,
 	execCommand,
 	execCommandStreaming,
 	parseStreamJsonResult,
-	detectStepFromOutput,
 } from "./base.ts";
 import type { AIResult, ProgressCallback } from "./types.ts";
 
@@ -19,7 +19,7 @@ export class QwenEngine extends BaseAIEngine {
 		const { stdout, stderr, exitCode } = await execCommand(
 			this.cliCommand,
 			["--output-format", "stream-json", "--approval-mode", "yolo", "-p", prompt],
-			workDir
+			workDir,
 		);
 
 		const output = stdout + stderr;
@@ -50,7 +50,7 @@ export class QwenEngine extends BaseAIEngine {
 	async executeStreaming(
 		prompt: string,
 		workDir: string,
-		onProgress: ProgressCallback
+		onProgress: ProgressCallback,
 	): Promise<AIResult> {
 		const outputLines: string[] = [];
 
@@ -66,7 +66,7 @@ export class QwenEngine extends BaseAIEngine {
 				if (step) {
 					onProgress(step);
 				}
-			}
+			},
 		);
 
 		const output = outputLines.join("\n");

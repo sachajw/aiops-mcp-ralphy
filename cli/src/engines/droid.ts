@@ -1,9 +1,9 @@
 import {
 	BaseAIEngine,
 	checkForErrors,
+	detectStepFromOutput,
 	execCommand,
 	execCommandStreaming,
-	detectStepFromOutput,
 } from "./base.ts";
 import type { AIResult, ProgressCallback } from "./types.ts";
 
@@ -18,7 +18,7 @@ export class DroidEngine extends BaseAIEngine {
 		const { stdout, stderr, exitCode } = await execCommand(
 			this.cliCommand,
 			["exec", "--output-format", "stream-json", "--auto", "medium", prompt],
-			workDir
+			workDir,
 		);
 
 		const output = stdout + stderr;
@@ -74,7 +74,7 @@ export class DroidEngine extends BaseAIEngine {
 	async executeStreaming(
 		prompt: string,
 		workDir: string,
-		onProgress: ProgressCallback
+		onProgress: ProgressCallback,
 	): Promise<AIResult> {
 		const outputLines: string[] = [];
 
@@ -90,7 +90,7 @@ export class DroidEngine extends BaseAIEngine {
 				if (step) {
 					onProgress(step);
 				}
-			}
+			},
 		);
 
 		const output = outputLines.join("\n");

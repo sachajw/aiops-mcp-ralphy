@@ -1,9 +1,9 @@
 import {
 	BaseAIEngine,
 	checkForErrors,
+	detectStepFromOutput,
 	execCommand,
 	execCommandStreaming,
-	detectStepFromOutput,
 } from "./base.ts";
 import type { AIResult, ProgressCallback } from "./types.ts";
 
@@ -18,7 +18,7 @@ export class CursorEngine extends BaseAIEngine {
 		const { stdout, stderr, exitCode } = await execCommand(
 			this.cliCommand,
 			["--print", "--force", "--output-format", "stream-json", prompt],
-			workDir
+			workDir,
 		);
 
 		const output = stdout + stderr;
@@ -84,7 +84,7 @@ export class CursorEngine extends BaseAIEngine {
 	async executeStreaming(
 		prompt: string,
 		workDir: string,
-		onProgress: ProgressCallback
+		onProgress: ProgressCallback,
 	): Promise<AIResult> {
 		const outputLines: string[] = [];
 
@@ -100,7 +100,7 @@ export class CursorEngine extends BaseAIEngine {
 				if (step) {
 					onProgress(step);
 				}
-			}
+			},
 		);
 
 		const output = outputLines.join("\n");

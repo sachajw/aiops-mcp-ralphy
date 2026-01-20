@@ -1,10 +1,10 @@
 import {
 	BaseAIEngine,
 	checkForErrors,
+	detectStepFromOutput,
 	execCommand,
 	execCommandStreaming,
 	parseStreamJsonResult,
-	detectStepFromOutput,
 } from "./base.ts";
 import type { AIResult, ProgressCallback } from "./types.ts";
 
@@ -18,8 +18,15 @@ export class ClaudeEngine extends BaseAIEngine {
 	async execute(prompt: string, workDir: string): Promise<AIResult> {
 		const { stdout, stderr, exitCode } = await execCommand(
 			this.cliCommand,
-			["--dangerously-skip-permissions", "--verbose", "--output-format", "stream-json", "-p", prompt],
-			workDir
+			[
+				"--dangerously-skip-permissions",
+				"--verbose",
+				"--output-format",
+				"stream-json",
+				"-p",
+				prompt,
+			],
+			workDir,
 		);
 
 		const output = stdout + stderr;
@@ -50,13 +57,20 @@ export class ClaudeEngine extends BaseAIEngine {
 	async executeStreaming(
 		prompt: string,
 		workDir: string,
-		onProgress: ProgressCallback
+		onProgress: ProgressCallback,
 	): Promise<AIResult> {
 		const outputLines: string[] = [];
 
 		const { exitCode } = await execCommandStreaming(
 			this.cliCommand,
-			["--dangerously-skip-permissions", "--verbose", "--output-format", "stream-json", "-p", prompt],
+			[
+				"--dangerously-skip-permissions",
+				"--verbose",
+				"--output-format",
+				"stream-json",
+				"-p",
+				prompt,
+			],
 			workDir,
 			(line) => {
 				outputLines.push(line);
@@ -66,7 +80,7 @@ export class ClaudeEngine extends BaseAIEngine {
 				if (step) {
 					onProgress(step);
 				}
-			}
+			},
 		);
 
 		const output = outputLines.join("\n");
